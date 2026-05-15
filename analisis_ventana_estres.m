@@ -173,13 +173,22 @@ for vi = 1:numel(VENTANAS)
         if y_min == y_max; y_max = y_min + 1; end
 
         nexttile; hold on;
+        set(gca, 'Color','white');
+
+        % Borde del episodio (sin relleno)
         patch([ep.fecha_ini ep.fecha_fin ep.fecha_fin ep.fecha_ini], ...
-              [y_min y_min y_max y_max],[1 0.75 0.75], ...
-              'FaceAlpha',0.4,'EdgeColor',[0.8 0.3 0.3],'LineWidth',0.8,'HandleVisibility','off');
+              [y_min y_min y_max y_max],[1 1 1], ...
+              'FaceAlpha',0,'EdgeColor',[0.85 0.15 0.15],'LineWidth',1.5,'HandleVisibility','off');
+
+        % Barras apiladas
         bz = bar(t(seg_v), [retiros_sf(seg_v), compras_mesa(seg_v)], 'stacked','EdgeColor','none');
         bz(1).FaceColor = COLOR_RETIROS; bz(1).DisplayName = 'Retiros SF';
         bz(2).FaceColor = COLOR_COMPRAS; bz(2).DisplayName = 'Compras Mesa';
-        yline(0,'k-','LineWidth',0.8);
+
+        % Línea del flujo total
+        plot(t(seg_v), flujo(seg_v), 'k-', 'LineWidth',1.2, 'DisplayName','Total');
+
+        yline(0,'k-','LineWidth',0.8,'HandleVisibility','off');
         ylim([y_min y_max]);
         title(sprintf('#%d  %s → %s\nAcum: %.0f MM  |  Peor: %.0f MM (%s)', e, ...
             datestr(ep.fecha_ini,'dd-mmm-yy'), datestr(ep.fecha_fin,'dd-mmm-yy'), ...
