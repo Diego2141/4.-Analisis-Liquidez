@@ -140,8 +140,8 @@ for vi = 1:numel(VENTANAS)
     area(t, min(sr,0), 'FaceColor',[0.85 0.2 0.2],'FaceAlpha',0.6,'EdgeColor','none');
     area(t, max(sr,0), 'FaceColor',[0.3 0.65 0.3],'FaceAlpha',0.6,'EdgeColor','none');
     yline(0,'k-','LineWidth',0.8);
-    title(sprintf('Suma rodante %d días (%d sem.)', N, N/5),'FontWeight','bold');
-    ylabel('MM'); grid on; box off;
+    title(sprintf('Suma rodante %d días (%d sem.)', N, N/5),'FontWeight','bold','FontSize',11);
+    ylabel('MM','FontSize',10); set(gca,'FontSize',9); grid on; box off;
 end
 xlabel('Fecha');
 sgtitle('Flujo Acumulado por Ventana Rodante (Retiros SF + Compras Mesa)', ...
@@ -180,13 +180,13 @@ for vi = 1:numel(VENTANAS)
               [y_min y_min y_max y_max], [0.82 0.82 0.82], ...
               'FaceAlpha',0.45, 'EdgeColor',[0 0 0], 'LineWidth',1.8, 'HandleVisibility','off');
 
-        % Retiros SF: gris oscuro sólido
-        bz1 = bar(t(seg_v), retiros_sf(seg_v), 'FaceColor',[0.25 0.25 0.25], ...
-                  'EdgeColor','none', 'DisplayName','Retiros SF');
+        % Retiros SF: blanco con borde negro
+        bz1 = bar(t(seg_v), retiros_sf(seg_v), 'FaceColor',[1 1 1], ...
+                  'EdgeColor',[0 0 0], 'LineWidth',0.8, 'DisplayName','Retiros SF');
 
-        % Compras Mesa: blanco con borde negro (vacías, sobre las barras anteriores)
-        bz2 = bar(t(seg_v), compras_mesa(seg_v), 'FaceColor',[1 1 1], ...
-                  'EdgeColor',[0 0 0], 'LineWidth',0.6, 'DisplayName','Compras Mesa');
+        % Compras Mesa: negro sólido
+        bz2 = bar(t(seg_v), compras_mesa(seg_v), 'FaceColor',[0.15 0.15 0.15], ...
+                  'EdgeColor','none', 'DisplayName','Compras Mesa');
 
         % Línea negra gruesa del flujo total con marcadores
         plot(t(seg_v), flujo(seg_v), 'k-o', 'LineWidth',2, ...
@@ -197,12 +197,13 @@ for vi = 1:numel(VENTANAS)
         title(sprintf('#%d  %s → %s\nAcum: %.0f MM  |  Peor: %.0f MM (%s)', e, ...
             datestr(ep.fecha_ini,'dd-mmm-yy'), datestr(ep.fecha_fin,'dd-mmm-yy'), ...
             ep.suma, ep.peor_flujo, datestr(ep.fecha_peor,'dd-mmm-yy')), ...
-            'FontSize',8,'FontWeight','bold');
-        ylabel('MM'); grid on; box off;
-        if e==1; legend('Location','best','FontSize',7); end
+            'FontSize',10,'FontWeight','bold');
+        ylabel('MM','FontSize',10); grid on; box off;
+        set(gca,'FontSize',9);
+        if e==1; legend('Location','best','FontSize',9); end
     end
     sgtitle(sprintf('Zoom — %d Peores Episodios | Ventana %d días (%d sem.)', ...
-        n_zoom, N, N/5),'FontSize',12,'FontWeight','bold');
+        n_zoom, N, N/5),'FontSize',14,'FontWeight','bold');
 
     % Ranking
     figure('Name', sprintf('Ranking %dd', N), 'Position',[30 30 950 580]);
@@ -213,15 +214,15 @@ for vi = 1:numel(VENTANAS)
         ep_list(1:top_r), 'UniformOutput', false);
     sumas_flip = sumas(end:-1:1);
     barh(top_r:-1:1, sumas_flip, 'FaceColor',[0.85 0.2 0.2],'EdgeColor','none');
-    set(gca,'YTick',1:top_r,'YTickLabel',flipud(labels),'FontSize',8);
-    xlabel('Flujo acumulado en la ventana (MM)');
+    set(gca,'YTick',1:top_r,'YTickLabel',flipud(labels),'FontSize',10);
+    xlabel('Flujo acumulado en la ventana (MM)','FontSize',11);
     title(sprintf('Ranking — Peores Episodios | Ventana %d días (%d sem.)', N, N/5), ...
-        'FontWeight','bold');
-    % Etiquetas de valor a la derecha de cada barra (fuera, sobre el cero)
+        'FontWeight','bold','FontSize',12);
+    % Etiquetas de valor a la derecha de cada barra
     for r = 1:top_r
         text(0, r, sprintf('  %.0f MM', sumas_flip(r)), ...
             'HorizontalAlignment','left', 'VerticalAlignment','middle', ...
-            'FontSize',7, 'FontWeight','bold', 'Color','k');
+            'FontSize',9, 'FontWeight','bold', 'Color','k');
     end
     grid on; box off;
 end
