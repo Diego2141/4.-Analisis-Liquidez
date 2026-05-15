@@ -17,7 +17,6 @@ GAP_1D       = 1;    % días positivos tolerados antes de cerrar episodio
 GAP_2D       = 2;    % ídem versión 2
 
 MIN_DURACION = 3;    % duración mínima para reportar un episodio (días)
-MAX_DURACION = 60;   % duración máxima de un episodio (días)
 
 TOP_TABLA    = 30;   % episodios a mostrar en tabla consola
 TOP_ZOOM     = 6;    % episodios para gráfica de zoom
@@ -50,8 +49,8 @@ flujo  = retiros_sf + compras_mesa;   % flujo neto diario combinado
 fprintf('============================================================\n');
 fprintf('  ANÁLISIS DE EPISODIOS DE ESTRÉS — LIQUIDEZ\n');
 fprintf('  Período  : %s  →  %s\n', datestr(t(1),'dd-mmm-yyyy'), datestr(t(end),'dd-mmm-yyyy'));
-fprintf('  Obs      : %d  |  Gap tol.: %d d / %d d  |  Dur.: %d-%d d\n', ...
-    n_obs, GAP_1D, GAP_2D, MIN_DURACION, MAX_DURACION);
+fprintf('  Obs      : %d  |  Gap tol.: %d d / %d d  |  Dur. min.: %d d\n', ...
+    n_obs, GAP_1D, GAP_2D, MIN_DURACION);
 fprintf('============================================================\n\n');
 
 dias_neg = sum(flujo < 0);
@@ -66,7 +65,7 @@ fprintf('  Peor día único          : %.2f MM  (%s)\n\n', min(flujo), ...
 % Un día es "estrés" si el flujo combinado es negativo.
 % Fusionamos días de estrés separados por ≤ gap_max días positivos.
 
-function episodios = identificar_episodios(flujo, t, gap_max, min_dur, max_dur)
+function episodios = identificar_episodios(flujo, t, gap_max, min_dur)
     stress  = flujo < 0;
 
     % Dilatar máscara: absorber gaps de hasta gap_max días positivos
@@ -95,7 +94,7 @@ function episodios = identificar_episodios(flujo, t, gap_max, min_dur, max_dur)
         seg_r = ini_r:fin_r;
 
         dur = fin_r - ini_r + 1;
-        if dur < min_dur || dur > max_dur; continue; end
+        if dur < min_dur; continue; end
 
         fl_acum     = sum(flujo(seg_r));
         fl_neg_acum = sum(flujo(flujo(seg_r)<0));
@@ -127,7 +126,7 @@ etiq_tol    = {sprintf('gap %d día',  GAP_1D), sprintf('gap %d días', GAP_2D)}
 resultados  = cell(2,1);
 
 for ti = 1:2
-    ep = identificar_episodios(flujo, t, tolerancias(ti), MIN_DURACION, MAX_DURACION);
+    ep = identificar_episodios(flujo, t, tolerancias(ti), MIN_DURACION);
     resultados{ti} = ep;
 
     fprintf('=== EPISODIOS — %s ===\n', etiq_tol{ti});
@@ -255,7 +254,7 @@ grid on; box off;
 fprintf('\n');
 fprintf('############################################################\n');
 fprintf('##   EPISODIOS DE ESTRÉS — RESUMEN COMPLETO CON FECHAS   ##\n');
-fprintf('##   Gap ≤ %d días  |  Dur. mín. %d días                   ##\n', GAP_2D, MIN_DURACION);
+fprintf('##   Gap <= %d dias  |  Dur. min. %d dias                   ##\n', GAP_2D, MIN_DURACION);
 fprintf('############################################################\n\n');
 
 fprintf('%-4s  %-13s  %-13s  %5s  %5s  %11s  %11s  %13s  %-13s\n', ...
