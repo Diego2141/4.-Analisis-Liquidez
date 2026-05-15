@@ -226,3 +226,23 @@ for vi = 1:numel(VENTANAS)
             ep.suma, ep.peor_flujo, datestr(ep.fecha_peor,'dd-mmm-yyyy'));
     end
 end
+
+%% ============================================================
+%% 5. GUARDAR FIGURAS EN JPG
+%% ============================================================
+carpeta_out = 'plots_estres';
+if ~exist(carpeta_out, 'dir'); mkdir(carpeta_out); end
+
+figs = findall(0, 'Type', 'figure');
+fprintf('\nGuardando %d figuras en carpeta "%s"...\n', numel(figs), carpeta_out);
+for f = 1:numel(figs)
+    fig = figs(f);
+    nombre = get(fig, 'Name');
+    if isempty(nombre); nombre = sprintf('figura_%d', fig.Number); end
+    nombre = strrep(nombre, ' ', '_');
+    nombre = regexprep(nombre, '[^a-zA-Z0-9_-]', '');
+    ruta   = fullfile(carpeta_out, sprintf('%02d_%s.jpg', fig.Number, nombre));
+    exportgraphics(fig, ruta, 'Resolution', 200);
+    fprintf('  Guardada: %s\n', ruta);
+end
+fprintf('Listo.\n');
