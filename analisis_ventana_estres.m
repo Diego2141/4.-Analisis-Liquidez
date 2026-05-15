@@ -175,9 +175,15 @@ for vi = 1:numel(VENTANAS)
         nexttile; hold on;
         set(gca, 'Color','white');
 
-        % Área sombreada — ancho fijo: N días hábiles × (7/5) = días calendario exactos
-        fecha_fin_patch = ep.fecha_ini + caldays(round(N * 7/5));
-        patch([ep.fecha_ini fecha_fin_patch fecha_fin_patch ep.fecha_ini], ...
+        % Área sombreada — todos los subplots con mismo rango calendario
+        ep_ancho   = caldays(round(N * 7/5));       % ancho fijo del episodio
+        margen_cal = caldays(round(MARGEN_ZOOM * 7/5));
+        xlim_lo    = ep.fecha_ini - margen_cal;
+        xlim_hi    = ep.fecha_ini + ep_ancho + margen_cal;
+        xlim([xlim_lo, xlim_hi]);
+
+        patch([ep.fecha_ini, ep.fecha_ini + ep_ancho, ...
+               ep.fecha_ini + ep_ancho, ep.fecha_ini], ...
               [y_min y_min y_max y_max], [0.82 0.82 0.82], ...
               'FaceAlpha',0.45, 'EdgeColor',[0 0 0], 'LineWidth',1.8, 'HandleVisibility','off');
 
@@ -206,24 +212,24 @@ for vi = 1:numel(VENTANAS)
     sgtitle(sprintf('Zoom — %d Peores Episodios | Ventana %d días (%d sem.)', ...
         n_zoom, N, N/5),'FontSize',14,'FontWeight','bold');
 
-    % Ranking
+    % Ranking — ep_list(1)=peor, ep_list(top_r)=menos severo
     figure('Name', sprintf('Ranking %dd', N), 'Position',[30 30 950 580]);
-    top_r  = min(TOP_RANKING, n_ep);
-    sumas  = [ep_list(1:top_r).suma];   % orden: peor(1) → mejor(top_r)
-    labels = arrayfun(@(ep) sprintf('%s → %s', ...
-        datestr(ep.fecha_ini,'dd-mmm-yy'), datestr(ep.fecha_fin,'dd-mmm-yy')), ...
-        ep_list(1:top_r), 'UniformOutput', false);
+    top_r = min(TOP_RANKING, n_ep);
 
-    % Y=top_r (arriba) = peor episodio; Y=1 (abajo) = menos severo
-    barh(top_r:-1:1, sumas, 'FaceColor',[0.85 0.2 0.2],'EdgeColor','none');
-    set(gca,'YTick',1:top_r,'YTickLabel',flipud(labels),'FontSize',10);
+    % Construir vectores de abajo (Y=1, menos severo) hacia arriba (Y=top_r, peor)
+    x_rank = [ep_list(top_r:-1:1).suma];   % x_rank(1)=menos severo, x_rank(top_r)=peor
+    l_rank = arrayfun(@(ep) sprintf('%s → %s', ...
+        datestr(ep.fecha_ini,'dd-mmm-yy'), datestr(ep.fecha_fin,'dd-mmm-yy')), ...
+        ep_list(top_r:-1:1), 'UniformOutput', false);  % mismo orden que x_rank
+
+    barh(1:top_r, x_rank, 'FaceColor',[0.85 0.2 0.2],'EdgeColor','none');
+    set(gca,'YTick',1:top_r,'YTickLabel',l_rank,'FontSize',10);
     xlabel('Flujo acumulado en la ventana (USD Millones)','FontSize',11);
     title(sprintf('Ranking — Peores Episodios | Ventana %d días (%d sem.)', N, N/5), ...
         'FontWeight','bold','FontSize',12);
-    % Etiqueta numérica alineada al eje 0, una por barra
+    % Valor numérico: mismo índice que x_rank → siempre correcto
     for r = 1:top_r
-        val = sumas(top_r - r + 1);   % valor que corresponde a la posición r
-        text(0, r, sprintf('  %.0f', val), ...
+        text(0, r, sprintf('  %.0f', x_rank(r)), ...
             'HorizontalAlignment','left', 'VerticalAlignment','middle', ...
             'FontSize',9, 'FontWeight','bold', 'Color','k');
     end
