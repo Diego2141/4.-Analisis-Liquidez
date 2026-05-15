@@ -162,7 +162,7 @@ grid on; box off; set(gca,'FontSize',9);
 sgtitle('Barrido de Ventanas — AnalisisRetirosME','FontSize',13,'FontWeight','bold');
 
 % --- Fig 2: Episodios por ventana en el tiempo ---
-N_sel = unique([N_SEL_BASE(N_SEL_BASE <= MAX_N), MAX_N]);
+N_sel = unique(N_SEL_BASE(N_SEL_BASE <= MAX_N));
 figure('Name','Barrido Ventanas - Detalle','Position',[30 30 1300 600]);
 hold on;
 colores = cool(numel(N_sel));
