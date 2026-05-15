@@ -175,9 +175,8 @@ for vi = 1:numel(VENTANAS)
         nexttile; hold on;
         set(gca, 'Color','white');
 
-        % Área sombreada del episodio — ancho fijo en días calendario
-        % (N días hábiles = N + 2*ceil(N/5) días calendario aprox.)
-        fecha_fin_patch = ep.fecha_ini + caldays(N + 2*floor(N/5));
+        % Área sombreada — ancho fijo: N días hábiles × (7/5) = días calendario exactos
+        fecha_fin_patch = ep.fecha_ini + caldays(round(N * 7/5));
         patch([ep.fecha_ini fecha_fin_patch fecha_fin_patch ep.fecha_ini], ...
               [y_min y_min y_max y_max], [0.82 0.82 0.82], ...
               'FaceAlpha',0.45, 'EdgeColor',[0 0 0], 'LineWidth',1.8, 'HandleVisibility','off');
