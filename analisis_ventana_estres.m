@@ -175,18 +175,22 @@ for vi = 1:numel(VENTANAS)
         nexttile; hold on;
         set(gca, 'Color','white');
 
-        % Borde negro del episodio
+        % Área sombreada del episodio (gris claro + borde negro)
         patch([ep.fecha_ini ep.fecha_fin ep.fecha_fin ep.fecha_ini], ...
-              [y_min y_min y_max y_max],[1 1 1], ...
-              'FaceAlpha',0,'EdgeColor',[0 0 0],'LineWidth',1.8,'HandleVisibility','off');
+              [y_min y_min y_max y_max], [0.82 0.82 0.82], ...
+              'FaceAlpha',0.45, 'EdgeColor',[0 0 0], 'LineWidth',1.8, 'HandleVisibility','off');
 
-        % Barras apiladas — grises diferenciados para impresión B&N
-        bz = bar(t(seg_v), [retiros_sf(seg_v), compras_mesa(seg_v)], 'stacked','EdgeColor','none');
-        bz(1).FaceColor = [0.30 0.30 0.30]; bz(1).DisplayName = 'Retiros SF';
-        bz(2).FaceColor = [0.75 0.75 0.75]; bz(2).DisplayName = 'Compras Mesa';
+        % Retiros SF: gris oscuro sólido
+        bz1 = bar(t(seg_v), retiros_sf(seg_v), 'FaceColor',[0.25 0.25 0.25], ...
+                  'EdgeColor','none', 'DisplayName','Retiros SF');
 
-        % Línea negra del flujo total
-        plot(t(seg_v), flujo(seg_v), 'k-', 'LineWidth',1.5, 'DisplayName','Total');
+        % Compras Mesa: blanco con borde negro (vacías, sobre las barras anteriores)
+        bz2 = bar(t(seg_v), compras_mesa(seg_v), 'FaceColor',[1 1 1], ...
+                  'EdgeColor',[0 0 0], 'LineWidth',0.6, 'DisplayName','Compras Mesa');
+
+        % Línea negra gruesa del flujo total con marcadores
+        plot(t(seg_v), flujo(seg_v), 'k-o', 'LineWidth',2, ...
+             'MarkerSize',3, 'MarkerFaceColor','k', 'DisplayName','Total');
 
         yline(0,'k-','LineWidth',0.8,'HandleVisibility','off');
         ylim([y_min y_max]);
