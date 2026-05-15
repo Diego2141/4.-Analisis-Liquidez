@@ -209,19 +209,21 @@ for vi = 1:numel(VENTANAS)
     % Ranking
     figure('Name', sprintf('Ranking %dd', N), 'Position',[30 30 950 580]);
     top_r  = min(TOP_RANKING, n_ep);
-    sumas  = [ep_list(1:top_r).suma];
+    sumas  = [ep_list(1:top_r).suma];   % orden: peor(1) → mejor(top_r)
     labels = arrayfun(@(ep) sprintf('%s → %s', ...
         datestr(ep.fecha_ini,'dd-mmm-yy'), datestr(ep.fecha_fin,'dd-mmm-yy')), ...
         ep_list(1:top_r), 'UniformOutput', false);
-    sumas_flip = sumas(end:-1:1);
-    barh(top_r:-1:1, sumas_flip, 'FaceColor',[0.85 0.2 0.2],'EdgeColor','none');
+
+    % Y=top_r (arriba) = peor episodio; Y=1 (abajo) = menos severo
+    barh(top_r:-1:1, sumas, 'FaceColor',[0.85 0.2 0.2],'EdgeColor','none');
     set(gca,'YTick',1:top_r,'YTickLabel',flipud(labels),'FontSize',10);
     xlabel('Flujo acumulado en la ventana (USD Millones)','FontSize',11);
     title(sprintf('Ranking — Peores Episodios | Ventana %d días (%d sem.)', N, N/5), ...
         'FontWeight','bold','FontSize',12);
-    % Etiquetas de valor a la derecha de cada barra (solo número)
+    % Etiqueta numérica alineada al eje 0, una por barra
     for r = 1:top_r
-        text(0, r, sprintf('  %.0f', sumas_flip(r)), ...
+        val = sumas(top_r - r + 1);   % valor que corresponde a la posición r
+        text(0, r, sprintf('  %.0f', val), ...
             'HorizontalAlignment','left', 'VerticalAlignment','middle', ...
             'FontSize',9, 'FontWeight','bold', 'Color','k');
     end
