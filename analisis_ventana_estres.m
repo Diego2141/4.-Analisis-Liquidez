@@ -175,8 +175,10 @@ for vi = 1:numel(VENTANAS)
         nexttile; hold on;
         set(gca, 'Color','white');
 
-        % Área sombreada del episodio (gris claro + borde negro)
-        patch([ep.fecha_ini ep.fecha_fin ep.fecha_fin ep.fecha_ini], ...
+        % Área sombreada del episodio — ancho fijo en días calendario
+        % (N días hábiles = N + 2*ceil(N/5) días calendario aprox.)
+        fecha_fin_patch = ep.fecha_ini + caldays(N + 2*floor(N/5));
+        patch([ep.fecha_ini fecha_fin_patch fecha_fin_patch ep.fecha_ini], ...
               [y_min y_min y_max y_max], [0.82 0.82 0.82], ...
               'FaceAlpha',0.45, 'EdgeColor',[0 0 0], 'LineWidth',1.8, 'HandleVisibility','off');
 
@@ -218,9 +220,9 @@ for vi = 1:numel(VENTANAS)
     xlabel('Flujo acumulado en la ventana (USD Millones)','FontSize',11);
     title(sprintf('Ranking — Peores Episodios | Ventana %d días (%d sem.)', N, N/5), ...
         'FontWeight','bold','FontSize',12);
-    % Etiquetas de valor a la derecha de cada barra
+    % Etiquetas de valor a la derecha de cada barra (solo número)
     for r = 1:top_r
-        text(0, r, sprintf('  %.0f USD Mill.', sumas_flip(r)), ...
+        text(0, r, sprintf('  %.0f', sumas_flip(r)), ...
             'HorizontalAlignment','left', 'VerticalAlignment','middle', ...
             'FontSize',9, 'FontWeight','bold', 'Color','k');
     end
