@@ -152,23 +152,17 @@ end
 ep_list = resultados{2};
 n_ep    = numel(ep_list);
 
-% --- Fig 1: Series crudas ---
-figure('Name','Series de Liquidez','Position',[30 30 1200 620]);
-tiledlayout(2,1,'TileSpacing','compact','Padding','compact');
-
-nexttile; hold on;
-bar(t, max(retiros_sf,0), 'FaceColor',COLOR_RETIROS*1.3,'EdgeColor','none');
-bar(t, min(retiros_sf,0), 'FaceColor',COLOR_RETIROS,     'EdgeColor','none');
+% --- Fig 1: Series apiladas ---
+figure('Name','Series de Liquidez','Position',[30 30 1200 500]);
+hold on;
+b = bar(t, [retiros_sf, compras_mesa], 'stacked', 'EdgeColor','none');
+b(1).FaceColor = COLOR_RETIROS;
+b(2).FaceColor = COLOR_COMPRAS;
 yline(0,'k-','LineWidth',0.8);
-title('Retiros SF (MM)','FontWeight','bold'); ylabel('MM'); grid on; box off;
-
-nexttile; hold on;
-bar(t, max(compras_mesa,0), 'FaceColor',COLOR_COMPRAS*1.1,'EdgeColor','none');
-bar(t, min(compras_mesa,0), 'FaceColor',COLOR_COMPRAS,     'EdgeColor','none');
-yline(0,'k-','LineWidth',0.8);
-title('Compras Netas Mesa (MM)','FontWeight','bold');
-ylabel('MM'); xlabel('Fecha'); grid on; box off;
-
+title('Retiros SF + Compras Netas Mesa — apiladas (MM)','FontWeight','bold');
+ylabel('MM'); xlabel('Fecha');
+legend({'Retiros SF','Compras Mesa'},'Location','best','FontSize',8);
+grid on; box off;
 sgtitle('Series de Liquidez — AnalisisRetirosME','FontSize',13,'FontWeight','bold');
 
 % --- Fig 2: Flujo neto + episodios sombreados ---
@@ -219,8 +213,11 @@ for e = 1:n_zoom
     patch([ep.fecha_ini ep.fecha_fin ep.fecha_fin ep.fecha_ini], ...
           [y_min y_min y_max y_max],[1 0.75 0.75], ...
           'FaceAlpha',0.4,'EdgeColor',[0.8 0.3 0.3],'LineWidth',0.8,'HandleVisibility','off');
-    bar(t(seg_v), retiros_sf(seg_v),   'FaceColor',COLOR_RETIROS,'EdgeColor','none','DisplayName','Retiros SF');
-    bar(t(seg_v), compras_mesa(seg_v), 'FaceColor',COLOR_COMPRAS,'EdgeColor','none','DisplayName','Compras Mesa');
+    bz = bar(t(seg_v), [retiros_sf(seg_v), compras_mesa(seg_v)], 'stacked', 'EdgeColor','none');
+    bz(1).FaceColor = COLOR_RETIROS;
+    bz(2).FaceColor = COLOR_COMPRAS;
+    bz(1).DisplayName = 'Retiros SF';
+    bz(2).DisplayName = 'Compras Mesa';
     yline(0,'k-','LineWidth',0.8);
     ylim([y_min y_max]);
     title(sprintf('#%d  %s → %s  (%dd)\nFlNeg: %.0f MM  |  Peor: %.0f MM (%s)', e, ...
