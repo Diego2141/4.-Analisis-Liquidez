@@ -13,7 +13,7 @@ flujo_c3 = data_values(:, 3);   % Flujo complementario 1
 flujo_c4 = data_values(:, 4);   % Flujo complementario 2
 
 series       = {saldo, retiros, flujo_c3, flujo_c4};
-nombres      = {'Saldo', 'Retiros', 'Flujo_C3', 'Flujo_C4'};
+nombres      = {'Saldo RIN', 'Retiros SF', 'Compras netas mesa', 'Compras netas f/mesa'};
 n_series     = numel(series);
 n_obs        = size(data_values, 1);
 
