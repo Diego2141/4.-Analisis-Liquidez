@@ -114,7 +114,7 @@ for vi = 1:numel(VENTANAS)
     fprintf('=== VENTANA %d días (%d semanas) ===\n', N, N/5);
     fprintf('  Episodios encontrados: %d\n\n', numel(episodios));
     fprintf('%-4s  %-13s  %-13s  %14s  %14s  %-13s\n', ...
-        'Rank','Inicio','Fin','Flujo acum.(MM)','Peor día(MM)','Fecha peor');
+        'Rank','Inicio','Fin','Flujo acum.(USD Millones)','Peor día(USD Mill.)','Fecha peor');
     fprintf('%s\n', repmat('-',1,75));
     for e = 1:numel(episodios)
         ep = episodios(e);
@@ -141,7 +141,7 @@ for vi = 1:numel(VENTANAS)
     area(t, max(sr,0), 'FaceColor',[0.3 0.65 0.3],'FaceAlpha',0.6,'EdgeColor','none');
     yline(0,'k-','LineWidth',0.8);
     title(sprintf('Suma rodante %d días (%d sem.)', N, N/5),'FontWeight','bold','FontSize',11);
-    ylabel('MM','FontSize',10); set(gca,'FontSize',9); grid on; box off;
+    ylabel('USD Millones','FontSize',10); set(gca,'FontSize',9); grid on; box off;
 end
 xlabel('Fecha');
 sgtitle('Flujo Acumulado por Ventana Rodante (Retiros SF + Compras Mesa)', ...
@@ -194,11 +194,11 @@ for vi = 1:numel(VENTANAS)
 
         yline(0,'k-','LineWidth',0.8,'HandleVisibility','off');
         ylim([y_min y_max]);
-        title(sprintf('#%d  %s → %s\nAcum: %.0f MM  |  Peor: %.0f MM (%s)', e, ...
+        title(sprintf('#%d  %s → %s\nAcum: %.0f USD Mill.  |  Peor: %.0f USD Mill. (%s)', e, ...
             datestr(ep.fecha_ini,'dd-mmm-yy'), datestr(ep.fecha_fin,'dd-mmm-yy'), ...
             ep.suma, ep.peor_flujo, datestr(ep.fecha_peor,'dd-mmm-yy')), ...
             'FontSize',10,'FontWeight','bold');
-        ylabel('MM','FontSize',10); grid on; box off;
+        ylabel('USD Millones','FontSize',10); grid on; box off;
         set(gca,'FontSize',9);
         if e==1; legend('Location','best','FontSize',9); end
     end
@@ -215,12 +215,12 @@ for vi = 1:numel(VENTANAS)
     sumas_flip = sumas(end:-1:1);
     barh(top_r:-1:1, sumas_flip, 'FaceColor',[0.85 0.2 0.2],'EdgeColor','none');
     set(gca,'YTick',1:top_r,'YTickLabel',flipud(labels),'FontSize',10);
-    xlabel('Flujo acumulado en la ventana (MM)','FontSize',11);
+    xlabel('Flujo acumulado en la ventana (USD Millones)','FontSize',11);
     title(sprintf('Ranking — Peores Episodios | Ventana %d días (%d sem.)', N, N/5), ...
         'FontWeight','bold','FontSize',12);
     % Etiquetas de valor a la derecha de cada barra
     for r = 1:top_r
-        text(0, r, sprintf('  %.0f MM', sumas_flip(r)), ...
+        text(0, r, sprintf('  %.0f USD Mill.', sumas_flip(r)), ...
             'HorizontalAlignment','left', 'VerticalAlignment','middle', ...
             'FontSize',9, 'FontWeight','bold', 'Color','k');
     end
@@ -238,7 +238,7 @@ for vi = 1:numel(VENTANAS)
     ep_list = resultados{vi};
     fprintf('\n--- Ventana %d días (%d semanas) ---\n', N, N/5);
     fprintf('%-4s  %-13s  %-13s  %14s  %14s  %-13s\n', ...
-        'Rank','Inicio','Fin','Flujo acum.(MM)','Peor día(MM)','Fecha peor');
+        'Rank','Inicio','Fin','Flujo acum.(USD Millones)','Peor día(USD Mill.)','Fecha peor');
     fprintf('%s\n', repmat('-',1,75));
     for e = 1:numel(ep_list)
         ep = ep_list(e);
