@@ -13,10 +13,21 @@
 clc; clear; close all;
 
 %% ============================================================
-%% PARÁMETROS
+%% PARÁMETROS  ← modificar aquí
 %% ============================================================
-% MAX_N se calcula automáticamente a partir del tamaño de la serie
-MARGEN_ZOOM  = 10;    % días de contexto a cada lado en zoom Kadane
+
+% Ventana máxima del barrido (días hábiles).
+% Usar Inf o [] para barrer hasta n_obs-1 (toda la serie).
+MAX_N_PARAM  = Inf;   % ej: 250 = 1 año hábil | Inf = sin límite
+
+% Días de contexto a cada lado del episodio en la gráfica de zoom (Kadane)
+MARGEN_ZOOM  = 10;
+
+% N seleccionados para la figura de episodios por ventana (Fig 2)
+N_SEL_BASE   = [1 2 3 5 10 15 20 30 60 90 120 180 250 500 1000];
+
+% Número de ventanas a mostrar en el top de consola
+TOP_CONSOLA  = 10;
 
 %% ============================================================
 %% 1. CARGA DE DATOS
@@ -36,7 +47,13 @@ end
 
 n_obs = numel(retiros_sf);
 flujo = retiros_sf + compras_mesa;
-MAX_N = n_obs - 1;   % sin límite superior: barre todas las ventanas posibles
+
+% Aplicar límite de ventana
+if isinf(MAX_N_PARAM) || isempty(MAX_N_PARAM)
+    MAX_N = n_obs - 1;
+else
+    MAX_N = min(round(MAX_N_PARAM), n_obs - 1);
+end
 
 fprintf('============================================================\n');
 fprintf('  ANÁLISIS DE VENTANA ÓPTIMA\n');
@@ -47,9 +64,8 @@ fprintf('============================================================\n\n');
 %% ============================================================
 %% 2. BARRIDO DE VENTANAS N=1..MAX_N
 %% ============================================================
-% Para cada N: peor suma rodante, y su posición (inicio de ventana)
 worst_sum  = zeros(MAX_N, 1);
-worst_idx  = zeros(MAX_N, 1);   % índice de inicio de la peor ventana
+worst_idx  = zeros(MAX_N, 1);
 
 for N = 1:MAX_N
     sr = movsum(flujo, [0, N-1]);
@@ -57,13 +73,9 @@ for N = 1:MAX_N
     [worst_sum(N), worst_idx(N)] = min(sr);
 end
 
-% Normalizar por longitud de ventana: peor suma por día
 worst_per_day = worst_sum ./ (1:MAX_N)';
 
-% Encontrar el N que produce la peor suma total (mínimo global)
-[~, N_opt_total] = min(worst_sum);
-
-% Encontrar el N con mayor "eficiencia" de estrés (peor suma/día mínima)
+[~, N_opt_total]  = min(worst_sum);
 [~, N_opt_perday] = min(worst_per_day);
 
 fprintf('--- BARRIDO DE VENTANAS ---\n');
@@ -72,12 +84,11 @@ fprintf('  N con peor suma total   : %d días hábiles  →  %.1f MM\n', ...
 fprintf('  N con peor suma/día     : %d días hábiles  →  %.2f MM/día\n\n', ...
     N_opt_perday, worst_per_day(N_opt_perday));
 
-% Detalle del top-10 ventanas por suma total
-fprintf('  Top 10 ventanas por suma acumulada:\n');
+fprintf('  Top %d ventanas por suma acumulada:\n', TOP_CONSOLA);
 fprintf('  %4s  %12s  %13s  %13s  %12s\n', 'N','Suma(MM)','Inicio','Fin','Suma/día');
 fprintf('  %s\n', repmat('-',1,58));
 [sums_sorted, ord_n] = sort(worst_sum);
-for k = 1:10
+for k = 1:TOP_CONSOLA
     N_k   = ord_n(k);
     ini_k = worst_idx(N_k);
     fin_k = min(n_obs, ini_k + N_k - 1);
@@ -89,9 +100,6 @@ end
 %% ============================================================
 %% 3. ALGORITMO DE KADANE (peor subarray contiguo)
 %% ============================================================
-% Versión mínima de Kadane: encuentra el subarray de suma mínima (más negativa)
-% Complejidad O(n). No requiere especificar longitud de ventana.
-
 min_ending_here = 0;
 min_so_far      = 0;
 ini_tmp         = 1;
@@ -130,10 +138,10 @@ fprintf('  Peor día        : %.1f MM  (%s)\n\n', kad_peor_v, ...
 %% 4. GRÁFICAS
 %% ============================================================
 
-% --- Fig 1: Curva worst_sum(N) vs N  [suma total] ---
+% --- Fig 1: Curva worst_sum(N) vs N ---
 figure('Name','Barrido Ventanas - Suma Total','Position',[30 30 900 480]);
 subplot(2,1,1);
-plot(1:MAX_N, worst_sum, 'b-o', 'LineWidth',1.8, 'MarkerSize',4, 'MarkerFaceColor','b');
+plot(1:MAX_N, worst_sum, 'b-', 'LineWidth',1.5);
 hold on;
 xline(N_opt_total, 'r--', 'LineWidth',1.4, ...
     'Label', sprintf('N=%d (peor suma)', N_opt_total), 'LabelVerticalAlignment','bottom');
@@ -143,7 +151,7 @@ title('Peor suma acumulada por tamaño de ventana N','FontWeight','bold','FontSi
 grid on; box off; set(gca,'FontSize',9);
 
 subplot(2,1,2);
-plot(1:MAX_N, worst_per_day, 'k-s', 'LineWidth',1.8, 'MarkerSize',4, 'MarkerFaceColor','k');
+plot(1:MAX_N, worst_per_day, 'k-', 'LineWidth',1.5);
 hold on;
 xline(N_opt_perday, 'r--', 'LineWidth',1.4, ...
     'Label', sprintf('N=%d (peor/día)', N_opt_perday), 'LabelVerticalAlignment','bottom');
@@ -153,10 +161,8 @@ title('Estrés por día según tamaño de ventana N','FontWeight','bold','FontSi
 grid on; box off; set(gca,'FontSize',9);
 sgtitle('Barrido de Ventanas — AnalisisRetirosME','FontSize',13,'FontWeight','bold');
 
-% --- Fig 2: Heatmap de peores ventanas para N seleccionados ---
-N_sel = [1 2 3 5 10 15 20 30 60 90 120 180 250 500 1000 MAX_N];
-N_sel = unique(N_sel(N_sel <= MAX_N));
-N_sel = N_sel(N_sel <= MAX_N);
+% --- Fig 2: Episodios por ventana en el tiempo ---
+N_sel = unique([N_SEL_BASE(N_SEL_BASE <= MAX_N), MAX_N]);
 figure('Name','Barrido Ventanas - Detalle','Position',[30 30 1300 600]);
 hold on;
 colores = cool(numel(N_sel));
@@ -179,7 +185,7 @@ title({'Episodios Óptimos por Ventana — AnalisisRetirosME', ...
       'FontSize',12,'FontWeight','bold');
 grid on; box off; set(gca,'FontSize',9);
 
-% --- Fig 3: Zoom Kadane — período completo ---
+% --- Fig 3: Zoom Kadane ---
 figure('Name','Kadane - Peor Episodio Historico','Position',[30 30 1300 550]);
 ini_v = max(1,     kad_ini - MARGEN_ZOOM);
 fin_v = min(n_obs, kad_fin + MARGEN_ZOOM);
@@ -190,26 +196,17 @@ y_max_k = max([retiros_sf(seg_v); compras_mesa(seg_v)]) * 1.25;
 if y_min_k == y_max_k; y_max_k = y_min_k + 1; end
 
 hold on;
-% Sombreado episodio
 patch([t(kad_ini) t(kad_fin) t(kad_fin) t(kad_ini)], ...
       [y_min_k y_min_k y_max_k y_max_k], [0.82 0.82 0.82], ...
       'FaceAlpha',0.45, 'EdgeColor',[0 0 0], 'LineWidth',2, 'HandleVisibility','off');
-
-% Retiros SF: blanco con borde negro
 bar(t(seg_v), retiros_sf(seg_v), 'FaceColor',[1 1 1], ...
     'EdgeColor',[0 0 0], 'LineWidth',0.8, 'DisplayName','Retiros SF');
-
-% Compras Mesa: negro sólido
 bar(t(seg_v), compras_mesa(seg_v), 'FaceColor',[0.15 0.15 0.15], ...
     'EdgeColor','none', 'DisplayName','Compras Mesa');
-
-% Flujo total
 plot(t(seg_v), flujo(seg_v), 'k-o', 'LineWidth',2, ...
      'MarkerSize',3, 'MarkerFaceColor','k', 'DisplayName','Total');
-
 yline(0,'k-','LineWidth',0.8,'HandleVisibility','off');
 ylim([y_min_k y_max_k]);
-
 legend('Location','best','FontSize',9);
 ylabel('USD Millones','FontSize',10);
 xlabel('Fecha','FontSize',10);
@@ -237,9 +234,9 @@ title('Flujo Neto Diario — Peor Episodio Histórico destacado (Kadane)','FontW
 grid on; box off; set(gca,'FontSize',9);
 sgtitle('AnalisisRetirosME — Serie Completa','FontSize',13,'FontWeight','bold');
 
-% --- Fig 5: Suma acumulada durante el episodio Kadane ---
+% --- Fig 5: Flujo acumulado dentro del episodio Kadane ---
 figure('Name','Kadane - Acumulado','Position',[30 30 900 400]);
-seg_kad = kad_ini:kad_fin;
+seg_kad  = kad_ini:kad_fin;
 acum_kad = cumsum(flujo(seg_kad));
 plot(t(seg_kad), acum_kad, 'k-', 'LineWidth',2);
 hold on;
