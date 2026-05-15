@@ -175,13 +175,13 @@ for vi = 1:numel(VENTANAS)
         nexttile; hold on;
         set(gca, 'Color','white');
 
-        % Área sombreada — todos los subplots con mismo rango calendario
-        ep_ancho   = caldays(round(N * 7/5));       % ancho fijo del episodio
+        % Calcular rango fijo de eje X (mismo ancho calendario en todos los paneles)
+        ep_ancho   = caldays(round(N * 7/5));
         margen_cal = caldays(round(MARGEN_ZOOM * 7/5));
         xlim_lo    = ep.fecha_ini - margen_cal;
         xlim_hi    = ep.fecha_ini + ep_ancho + margen_cal;
-        xlim([xlim_lo, xlim_hi]);
 
+        % Área sombreada del episodio
         patch([ep.fecha_ini, ep.fecha_ini + ep_ancho, ...
                ep.fecha_ini + ep_ancho, ep.fecha_ini], ...
               [y_min y_min y_max y_max], [0.82 0.82 0.82], ...
@@ -201,6 +201,7 @@ for vi = 1:numel(VENTANAS)
 
         yline(0,'k-','LineWidth',0.8,'HandleVisibility','off');
         ylim([y_min y_max]);
+        xlim([xlim_lo, xlim_hi]);   % aplicar DESPUÉS de los plots (eje ya es datetime)
         title(sprintf('#%d  %s → %s\nAcum: %.0f USD Mill.  |  Peor: %.0f USD Mill. (%s)', e, ...
             datestr(ep.fecha_ini,'dd-mmm-yy'), datestr(ep.fecha_fin,'dd-mmm-yy'), ...
             ep.suma, ep.peor_flujo, datestr(ep.fecha_peor,'dd-mmm-yy')), ...
