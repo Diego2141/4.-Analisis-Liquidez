@@ -207,11 +207,19 @@ for vi = 1:numel(VENTANAS)
     labels = arrayfun(@(ep) sprintf('%s → %s', ...
         datestr(ep.fecha_ini,'dd-mmm-yy'), datestr(ep.fecha_fin,'dd-mmm-yy')), ...
         ep_list(1:top_r), 'UniformOutput', false);
-    barh(top_r:-1:1, sumas(end:-1:1), 'FaceColor',[0.85 0.2 0.2],'EdgeColor','none');
+    sumas_flip = sumas(end:-1:1);
+    barh(top_r:-1:1, sumas_flip, 'FaceColor',[0.85 0.2 0.2],'EdgeColor','none');
     set(gca,'YTick',1:top_r,'YTickLabel',flipud(labels),'FontSize',8);
     xlabel('Flujo acumulado en la ventana (MM)');
     title(sprintf('Ranking — Peores Episodios | Ventana %d días (%d sem.)', N, N/5), ...
         'FontWeight','bold');
+    % Etiquetas de valor al extremo de cada barra
+    for r = 1:top_r
+        text(sumas_flip(r) - abs(min(sumas_flip))*0.01, r, ...
+            sprintf(' %.0f MM', sumas_flip(r)), ...
+            'HorizontalAlignment','right', 'VerticalAlignment','middle', ...
+            'FontSize',7, 'FontWeight','bold', 'Color','white');
+    end
     grid on; box off;
 end
 
