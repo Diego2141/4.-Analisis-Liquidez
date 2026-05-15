@@ -14,9 +14,10 @@ clc; clear; close all;
 %% PARÁMETROS — modificar aquí
 %% ============================================================
 
-% Tolerancias de gap entre episodios (días hábiles)
-GAP_1SEM   = 5;    % 1 semana
-GAP_2SEM   = 10;   % 2 semanas
+% Tolerancias de gap: días positivos consecutivos que se pueden
+% saltar sin cerrar el episodio de estrés
+GAP_1D = 1;    % tolerar 1 día positivo aislado
+GAP_2D = 2;    % tolerar 2 días positivos consecutivos
 
 % Duración mínima de un episodio para ser reportado (días)
 MIN_DURACION = 3;
@@ -57,7 +58,7 @@ fprintf('============================================================\n');
 fprintf('  ANÁLISIS DE DRAWDOWN — ESTRÉS DE LIQUIDEZ\n');
 fprintf('  Período  : %s  →  %s\n', datestr(t(1),'dd-mmm-yyyy'), datestr(t(end),'dd-mmm-yyyy'));
 fprintf('  Obs      : %d\n', n_obs);
-fprintf('  Gap tol. : %d d (1 sem)  /  %d d (2 sem)\n', GAP_1SEM, GAP_2SEM);
+fprintf('  Gap tol. : %d día  /  %d días\n', GAP_1D, GAP_2D);
 fprintf('============================================================\n\n');
 
 %% ============================================================
@@ -93,8 +94,8 @@ fprintf('  Días en DD < 0  : %d  (%.1f%%)\n', sum(drawdown<0), sum(drawdown<0)/
 % Un episodio es un período continuo de drawdown < 0.
 % Gaps ≤ tolerancia entre episodios se fusionan en uno solo.
 
-tolerancias = [GAP_1SEM, GAP_2SEM];
-etiq_tol    = {sprintf('1 sem (%dd)', GAP_1SEM), sprintf('2 sem (%dd)', GAP_2SEM)};
+tolerancias = [GAP_1D, GAP_2D];
+etiq_tol    = {sprintf('gap 1 día'), sprintf('gap 2 días')};
 resultados  = cell(2, 1);
 
 for ti = 1:2
@@ -162,7 +163,7 @@ end
 %% ============================================================
 %% 4. GRÁFICAS
 %% ============================================================
-ep_list = resultados{2};   % tolerancia 2 semanas para visualización
+ep_list = resultados{2};   % tolerancia gap 2 días para visualización
 n_ep    = numel(ep_list);
 
 % --- Fig 1: Series crudas + flujo neto combinado ---
@@ -216,7 +217,7 @@ plot(t, drawdown, 'Color',[0.1 0.1 0.1], 'LineWidth',1);
 yline(0,'k-','LineWidth',0.8);
 ylim([dd_min 0]);
 ylabel('MM acumulados'); xlabel('Fecha');
-title(sprintf('Drawdown Acumulado de Liquidez — Top %d Episodios de Estrés (gap ≤ 2 sem.)', top_ep), ...
+title(sprintf('Drawdown Acumulado de Liquidez — Top %d Episodios de Estrés (gap ≤ 2 días)', top_ep), ...
     'FontWeight','bold');
 grid on; box off;
 
@@ -252,7 +253,7 @@ for e = 1:n_zoom
     ylabel('MM'); grid on; box off;
     if e == 1; legend('Location','best','FontSize',7); end
 end
-sgtitle(sprintf('Zoom — %d Peores Episodios de Estrés (gap ≤ 2 sem.)', n_zoom), ...
+sgtitle(sprintf('Zoom — %d Peores Episodios de Estrés (gap ≤ 2 días)', n_zoom), ...
     'FontSize',13,'FontWeight','bold');
 
 % --- Fig 4: Ranking horizontal ---
@@ -266,7 +267,7 @@ labels = arrayfun(@(ep) sprintf('%s → %s  (%dd)', ...
 barh(top_r:-1:1, dd_top(end:-1:1), 'FaceColor',[0.85 0.2 0.2], 'EdgeColor','none');
 set(gca,'YTick',1:top_r,'YTickLabel',flipud(labels),'FontSize',8);
 xlabel('Drawdown máximo (MM acumulados)');
-title(sprintf('Ranking — %d Peores Episodios de Estrés de Liquidez\n(ordenado por profundidad de drawdown, gap ≤ 2 sem.)', top_r), ...
+title(sprintf('Ranking — %d Peores Episodios de Estrés de Liquidez\n(ordenado por profundidad de drawdown, gap ≤ 2 días)', top_r), ...
     'FontWeight','bold');
 grid on; box off;
 
@@ -280,7 +281,7 @@ fprintf('============================================================\n');
 fprintf('\n\n');
 fprintf('############################################################\n');
 fprintf('##  EPISODIOS DE ESTRÉS IDENTIFICADOS — FECHAS EXACTAS   ##\n');
-fprintf('##  (tolerancia gap 2 semanas | dur. mín. %d días)        ##\n', MIN_DURACION);
+fprintf('##  (tolerancia gap 2 días | dur. mín. %d días)           ##\n', MIN_DURACION);
 fprintf('############################################################\n\n');
 
 fprintf('%-4s  %-16s  %-16s  %6s  %12s  %12s  %12s  %-14s\n', ...
