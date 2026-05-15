@@ -170,16 +170,26 @@ fig_h = 1;
 
 % 9a. Series temporales
 figure(fig_h); fig_h = fig_h+1;
-tiledlayout(n_series, 1, 'TileSpacing','compact');
+set(gcf, 'Position', [30 30 1400 750]);
+tiledlayout(n_series, 1, 'TileSpacing','compact', 'Padding','compact');
 for i = 1:n_series
     nexttile;
-    plot(t, series{i}, 'LineWidth', 0.8);
-    title(nombres{i}, 'FontWeight','bold');
-    if tiene_fechas; xlabel('Fecha'); else; xlabel('Observación'); end
-    ylabel('Valor');
+    plot(t, series{i}, 'LineWidth', 0.9, 'Color', [0.15 0.35 0.65]);
+    title(nombres{i}, 'FontWeight','bold', 'FontSize', 11);
+    ylabel('USD Millones', 'FontSize', 9);
+    set(gca, 'FontSize', 9, 'YTickMode','auto', 'XTickMode','auto');
+    % Limitar a 5 marcas en Y y 6 en X
+    yticks(linspace(min(ylim), max(ylim), 5));
+    ax = gca; ax.XAxis.TickValues = ax.XAxis.TickValues(...
+        round(linspace(1, numel(ax.XAxis.TickValues), min(6, numel(ax.XAxis.TickValues)))));
+    if i == n_series
+        if tiene_fechas; xlabel('Fecha','FontSize',10); else; xlabel('Observación','FontSize',10); end
+    else
+        set(gca,'XTickLabel',[]);
+    end
     grid on; box off;
 end
-sgtitle('Series Temporales - AnalisisRetirosME', 'FontSize',13,'FontWeight','bold');
+sgtitle('Series Temporales — AnalisisRetirosME (USD Millones)', 'FontSize', 14, 'FontWeight','bold');
 
 % 9b. Histogramas con curva normal
 figure(fig_h); fig_h = fig_h+1;
