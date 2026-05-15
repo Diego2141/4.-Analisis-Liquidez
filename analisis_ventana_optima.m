@@ -174,9 +174,10 @@ yline(0,'k-','LineWidth',0.8);
 legend('Location','best','FontSize',8,'NumColumns',3);
 ylabel('Flujo acumulado (MM)','FontSize',10);
 xlabel('Fecha','FontSize',10);
-title('Peor episodio para cada tamaño de ventana N seleccionado','FontWeight','bold','FontSize',11);
+title({'Episodios Óptimos por Ventana — AnalisisRetirosME', ...
+       'Peor episodio para cada tamaño de ventana N seleccionado'}, ...
+      'FontSize',12,'FontWeight','bold');
 grid on; box off; set(gca,'FontSize',9);
-sgtitle('Episodios Óptimos por Ventana — AnalisisRetirosME','FontSize',13,'FontWeight','bold');
 
 % --- Fig 3: Zoom Kadane — período completo ---
 figure('Name','Kadane - Peor Episodio Historico','Position',[30 30 1300 550]);
