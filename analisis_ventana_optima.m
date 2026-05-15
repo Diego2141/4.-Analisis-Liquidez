@@ -15,7 +15,7 @@ clc; clear; close all;
 %% ============================================================
 %% PARÁMETROS
 %% ============================================================
-MAX_N        = 60;    % máximo de días hábiles en el barrido
+MAX_N        = 249;   % máximo de días hábiles en el barrido (< 250 = 1 año hábil)
 MARGEN_ZOOM  = 10;    % días de contexto a cada lado en zoom Kadane
 
 %% ============================================================
@@ -153,7 +153,7 @@ grid on; box off; set(gca,'FontSize',9);
 sgtitle('Barrido de Ventanas — AnalisisRetirosME','FontSize',13,'FontWeight','bold');
 
 % --- Fig 2: Heatmap de peores ventanas para N seleccionados ---
-N_sel = [1 2 3 4 5 7 10 15 20 30 40 50 60];
+N_sel = [1 2 3 5 10 15 20 30 40 60 90 120 180 249];
 N_sel = N_sel(N_sel <= MAX_N);
 figure('Name','Barrido Ventanas - Detalle','Position',[30 30 1300 600]);
 hold on;
