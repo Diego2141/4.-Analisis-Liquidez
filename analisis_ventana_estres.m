@@ -180,10 +180,10 @@ for vi = 1:numel(VENTANAS)
               [y_min y_min y_max y_max],[1 1 1], ...
               'FaceAlpha',0,'EdgeColor',[0.85 0.15 0.15],'LineWidth',1.5,'HandleVisibility','off');
 
-        % Barras apiladas
-        bz = bar(t(seg_v), [retiros_sf(seg_v), compras_mesa(seg_v)], 'stacked','EdgeColor','none');
-        bz(1).FaceColor = COLOR_RETIROS; bz(1).DisplayName = 'Retiros SF';
-        bz(2).FaceColor = COLOR_COMPRAS; bz(2).DisplayName = 'Compras Mesa';
+        % Barras apiladas — vacías (sin relleno) para impresión en B&N
+        bz = bar(t(seg_v), [retiros_sf(seg_v), compras_mesa(seg_v)], 'stacked');
+        bz(1).FaceColor = 'none'; bz(1).EdgeColor = [0 0 0];       bz(1).LineWidth = 0.8; bz(1).DisplayName = 'Retiros SF';
+        bz(2).FaceColor = 'none'; bz(2).EdgeColor = [0.5 0.5 0.5]; bz(2).LineWidth = 0.8; bz(2).DisplayName = 'Compras Mesa';
 
         % Línea del flujo total
         plot(t(seg_v), flujo(seg_v), 'k-', 'LineWidth',1.2, 'DisplayName','Total');
