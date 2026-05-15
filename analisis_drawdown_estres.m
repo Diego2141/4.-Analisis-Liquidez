@@ -1,12 +1,11 @@
-%% ANÁLISIS DE DRAWDOWN - Períodos de Estrés de Liquidez
+%% ANÁLISIS DE EPISODIOS DE ESTRÉS DE LIQUIDEZ
 % Series analizadas:
 %   - Retiros SF        (col 2): negativo = salida de liquidez
 %   - Compras netas mesa (col 3): negativo = salida de liquidez
 %
-% Metodología: drawdown sobre flujo TOTAL combinado (positivo + negativo).
-% Los días positivos reducen genuinamente el drawdown; un día positivo
-% pequeño no cierra el episodio salvo que sea suficientemente grande
-% para recuperar el nivel previo.
+% Metodología: clustering de días de flujo negativo con tolerancia de gap.
+% Un episodio = bloque de días negativos separados por ≤ GAP días positivos.
+% Se rankean por flujo negativo acumulado dentro del episodio.
 
 clc; clear; close all;
 
@@ -14,27 +13,19 @@ clc; clear; close all;
 %% PARÁMETROS — modificar aquí
 %% ============================================================
 
-% Tolerancias de gap: días positivos consecutivos que se pueden
-% saltar sin cerrar el episodio de estrés
-GAP_1D = 1;    % tolerar 1 día positivo aislado
-GAP_2D = 2;    % tolerar 2 días positivos consecutivos
+GAP_1D       = 1;    % días positivos tolerados antes de cerrar episodio
+GAP_2D       = 2;    % ídem versión 2
 
-% Duración mínima de un episodio para ser reportado (días)
-MIN_DURACION = 3;
+MIN_DURACION = 3;    % duración mínima para reportar un episodio (días)
 
-% Número de episodios a mostrar en tabla consola
-TOP_TABLA = 20;
+TOP_TABLA    = 30;   % episodios a mostrar en tabla consola
+TOP_ZOOM     = 6;    % episodios para gráfica de zoom
+TOP_RANKING  = 20;   % episodios para gráfica de ranking
 
-% Número de episodios en gráfica de zoom y ranking
-TOP_ZOOM    = 5;
-TOP_RANKING = 15;
+MARGEN_ZOOM  = 10;   % días de contexto a cada lado del episodio en zoom
 
-% Margen de contexto en gráficas de zoom (días a cada lado del episodio)
-MARGEN_ZOOM = 20;
-
-% Colores de series
-COLOR_RETIROS = [0.20 0.45 0.75];   % azul
-COLOR_COMPRAS = [0.85 0.40 0.10];   % naranja
+COLOR_RETIROS = [0.20 0.45 0.75];
+COLOR_COMPRAS = [0.85 0.40 0.10];
 
 %% ============================================================
 %% 1. CARGA DE DATOS
@@ -52,259 +43,235 @@ else
     warning('Variable "dates" no encontrada. Se usó fecha sintética.');
 end
 
-n_obs = numel(retiros_sf);
+n_obs  = numel(retiros_sf);
+flujo  = retiros_sf + compras_mesa;   % flujo neto diario combinado
 
 fprintf('============================================================\n');
-fprintf('  ANÁLISIS DE DRAWDOWN — ESTRÉS DE LIQUIDEZ\n');
+fprintf('  ANÁLISIS DE EPISODIOS DE ESTRÉS — LIQUIDEZ\n');
 fprintf('  Período  : %s  →  %s\n', datestr(t(1),'dd-mmm-yyyy'), datestr(t(end),'dd-mmm-yyyy'));
-fprintf('  Obs      : %d\n', n_obs);
-fprintf('  Gap tol. : %d día  /  %d días\n', GAP_1D, GAP_2D);
+fprintf('  Obs      : %d  |  Gap tol.: %d d / %d d  |  Dur. mín.: %d d\n', ...
+    n_obs, GAP_1D, GAP_2D, MIN_DURACION);
 fprintf('============================================================\n\n');
 
-%% ============================================================
-%% 2. FLUJO COMBINADO Y DRAWDOWN
-%% ============================================================
-% Flujo total: suma de ambas series (positivos y negativos incluidos).
-% Los días positivos genuinamente recuperan liquidez y pueden cerrar episodios.
-flujo = retiros_sf + compras_mesa;
-
-% Drawdown sobre el flujo acumulado
-cum_flujo  = cumsum(flujo);
-peak_run   = cummax(cum_flujo);
-drawdown   = cum_flujo - peak_run;    % ≤ 0; 0 = nivel máximo histórico
-
-% Flujo de estrés puro (solo componente negativa) — para estadísticas y Fig 1
-flujo_neg = min(retiros_sf, 0) + min(compras_mesa, 0);
-
 dias_neg = sum(flujo < 0);
-fprintf('--- FLUJO COMBINADO DIARIO (MM) ---\n');
 fprintf('  Días con flujo negativo : %d  (%.1f%%)\n', dias_neg, dias_neg/n_obs*100);
 fprintf('  Flujo medio (días neg.) : %.2f MM\n', mean(flujo(flujo<0)));
-fprintf('  Peor día                : %.2f MM  (%s)\n', min(flujo), ...
+fprintf('  Peor día único          : %.2f MM  (%s)\n\n', min(flujo), ...
     datestr(t(flujo==min(flujo)),'dd-mmm-yyyy'));
 
-fprintf('\n--- DRAWDOWN ACUMULADO (MM) ---\n');
-fprintf('  Drawdown máximo : %.2f MM\n', min(drawdown));
-fprintf('  Drawdown medio  : %.2f MM\n', mean(drawdown(drawdown<0)));
-fprintf('  Días en DD < 0  : %d  (%.1f%%)\n', sum(drawdown<0), sum(drawdown<0)/n_obs*100);
-
 %% ============================================================
-%% 3. IDENTIFICACIÓN DE EPISODIOS
+%% 2. IDENTIFICACIÓN DE EPISODIOS
 %% ============================================================
-% Un episodio es un período continuo de drawdown < 0.
-% Gaps ≤ tolerancia entre episodios se fusionan en uno solo.
+% Un día es "estrés" si el flujo combinado es negativo.
+% Fusionamos días de estrés separados por ≤ gap_max días positivos.
 
-tolerancias = [GAP_1D, GAP_2D];
-etiq_tol    = {sprintf('gap 1 día'), sprintf('gap 2 días')};
-resultados  = cell(2, 1);
+function episodios = identificar_episodios(flujo, t, gap_max, min_dur)
+    stress  = flujo < 0;
 
-for ti = 1:2
-    gap_max  = tolerancias(ti);
-    en_dd    = drawdown < 0;
-
-    % Dilatar máscara hacia adelante para absorber gaps cortos
-    en_dd_dil = en_dd;
+    % Dilatar máscara: absorber gaps de hasta gap_max días positivos
+    stress_dil = stress;
     for g = 1:gap_max
-        en_dd_dil(g+1:end) = en_dd_dil(g+1:end) | en_dd(1:end-g);
+        stress_dil(g+1:end) = stress_dil(g+1:end) | stress(1:end-g);
     end
 
-    diff_dd = diff([0; en_dd_dil; 0]);
-    inicios = find(diff_dd ==  1);
-    fines   = find(diff_dd == -1) - 1;
+    diff_s  = diff([0; stress_dil; 0]);
+    inicios = find(diff_s ==  1);
+    fines   = find(diff_s == -1) - 1;
 
     episodios = struct('inicio',{},'fin',{},'duracion',{},...
                        'flujo_acum',{},'flujo_neg_acum',{},...
-                       'max_dd',{},'peor_dia',{},...
+                       'n_dias_neg',{},'peor_flujo',{},...
                        'fecha_ini',{},'fecha_fin',{},'fecha_peor',{});
 
     for e = 1:numel(inicios)
-        idx  = inicios(e):fines(e);
-        real = idx(en_dd(idx));
-        if isempty(real); continue; end
-        ini_r = real(1); fin_r = real(end);
-        seg   = ini_r:fin_r;
+        seg = inicios(e):fines(e);
+
+        % Recortar al primer y último día negativo real del bloque
+        neg_en_seg = find(stress(seg));
+        if isempty(neg_en_seg); continue; end
+        ini_r = seg(neg_en_seg(1));
+        fin_r = seg(neg_en_seg(end));
+        seg_r = ini_r:fin_r;
 
         dur = fin_r - ini_r + 1;
-        if dur < MIN_DURACION; continue; end
+        if dur < min_dur; continue; end
 
-        [~, ip] = min(flujo(seg));
+        fl_acum     = sum(flujo(seg_r));
+        fl_neg_acum = sum(flujo(flujo(seg_r)<0));
+        n_neg       = sum(flujo(seg_r) < 0);
+        [pf, ip]    = min(flujo(seg_r));
 
-        ep.inicio          = ini_r;
-        ep.fin             = fin_r;
-        ep.duracion        = dur;
-        ep.flujo_acum      = sum(flujo(seg));        % flujo neto total (MM)
-        ep.flujo_neg_acum  = sum(flujo_neg(seg));    % componente negativa pura (MM)
-        ep.max_dd          = min(drawdown(seg));
-        ep.peor_dia        = flujo(ini_r + ip - 1);
-        ep.fecha_ini       = t(ini_r);
-        ep.fecha_fin       = t(fin_r);
-        ep.fecha_peor      = t(ini_r + ip - 1);
-        episodios(end+1)   = ep; %#ok<AGROW>
+        ep.inicio         = ini_r;
+        ep.fin            = fin_r;
+        ep.duracion       = dur;
+        ep.flujo_acum     = fl_acum;
+        ep.flujo_neg_acum = fl_neg_acum;
+        ep.n_dias_neg     = n_neg;
+        ep.peor_flujo     = pf;
+        ep.fecha_ini      = t(ini_r);
+        ep.fecha_fin      = t(fin_r);
+        ep.fecha_peor     = t(ini_r + ip - 1);
+        episodios(end+1)  = ep; %#ok<AGROW>
     end
 
-    % Ordenar por drawdown máximo (hoyo más profundo = más severo)
-    [~, ord] = sort([episodios.max_dd]);
-    episodios = episodios(ord);
-    resultados{ti} = episodios;
-
-    fprintf('\n=== EPISODIOS — tolerancia %s ===\n', etiq_tol{ti});
-    fprintf('  Total episodios (dur ≥ %dd) : %d\n\n', MIN_DURACION, numel(episodios));
-    fprintf('%-4s  %-13s  %-13s  %6s  %11s  %11s  %10s  %13s\n', ...
-        'Rank','Inicio','Fin','Días','Flujo neto','Flujo neg.','MaxDD(MM)','Peor día(MM)');
-    fprintf('%s\n', repmat('-',1,88));
-    for e = 1:min(TOP_TABLA, numel(episodios))
-        ep = episodios(e);
-        fprintf('%-4d  %-13s  %-13s  %6d  %11.1f  %11.1f  %10.1f  %13.1f\n', e, ...
-            datestr(ep.fecha_ini,'dd-mmm-yyyy'), datestr(ep.fecha_fin,'dd-mmm-yyyy'), ...
-            ep.duracion, ep.flujo_acum, ep.flujo_neg_acum, ep.max_dd, ep.peor_dia);
+    % Ordenar por flujo negativo acumulado (más negativo = más severo)
+    if ~isempty(episodios)
+        [~, ord]  = sort([episodios.flujo_neg_acum]);
+        episodios = episodios(ord);
     end
 end
 
+tolerancias = [GAP_1D, GAP_2D];
+etiq_tol    = {sprintf('gap %d día',  GAP_1D), sprintf('gap %d días', GAP_2D)};
+resultados  = cell(2,1);
+
+for ti = 1:2
+    ep = identificar_episodios(flujo, t, tolerancias(ti), MIN_DURACION);
+    resultados{ti} = ep;
+
+    fprintf('=== EPISODIOS — %s ===\n', etiq_tol{ti});
+    fprintf('  Total episodios (dur ≥ %dd): %d\n\n', MIN_DURACION, numel(ep));
+
+    if isempty(ep); continue; end
+
+    fprintf('%-4s  %-13s  %-13s  %5s  %5s  %11s  %11s  %13s  %-13s\n', ...
+        'Rank','Inicio','Fin','Días','Neg.','FlNeto(MM)','FlNeg(MM)','Peor día(MM)','Fecha peor');
+    fprintf('%s\n', repmat('-',1,100));
+    for e = 1:min(TOP_TABLA, numel(ep))
+        fprintf('%-4d  %-13s  %-13s  %5d  %5d  %11.1f  %11.1f  %13.1f  %-13s\n', e, ...
+            datestr(ep(e).fecha_ini,'dd-mmm-yyyy'), datestr(ep(e).fecha_fin,'dd-mmm-yyyy'), ...
+            ep(e).duracion, ep(e).n_dias_neg, ep(e).flujo_acum, ep(e).flujo_neg_acum, ...
+            ep(e).peor_flujo, datestr(ep(e).fecha_peor,'dd-mmm-yyyy'));
+    end
+    fprintf('\n');
+end
+
 %% ============================================================
-%% 4. GRÁFICAS
+%% 3. GRÁFICAS  (usar gap 2 días para visualización)
 %% ============================================================
-ep_list = resultados{2};   % tolerancia gap 2 días para visualización
+ep_list = resultados{2};
 n_ep    = numel(ep_list);
 
-% --- Fig 1: Series crudas + flujo neto combinado ---
-figure('Name','Series y Flujo','Position',[30 30 1200 680]);
-tiledlayout(3,1,'TileSpacing','compact','Padding','compact');
+% --- Fig 1: Series crudas ---
+figure('Name','Series de Liquidez','Position',[30 30 1200 620]);
+tiledlayout(2,1,'TileSpacing','compact','Padding','compact');
 
-nexttile;
-bar(t, retiros_sf, 'FaceColor', COLOR_RETIROS, 'EdgeColor','none');
+nexttile; hold on;
+bar(t, max(retiros_sf,0), 'FaceColor',COLOR_RETIROS*1.3,'EdgeColor','none');
+bar(t, min(retiros_sf,0), 'FaceColor',COLOR_RETIROS,     'EdgeColor','none');
 yline(0,'k-','LineWidth',0.8);
-title('Retiros SF (MM)','FontWeight','bold');
-ylabel('MM'); grid on; box off;
+title('Retiros SF (MM)','FontWeight','bold'); ylabel('MM'); grid on; box off;
 
-nexttile;
-bar(t, compras_mesa, 'FaceColor', COLOR_COMPRAS, 'EdgeColor','none');
+nexttile; hold on;
+bar(t, max(compras_mesa,0), 'FaceColor',COLOR_COMPRAS*1.1,'EdgeColor','none');
+bar(t, min(compras_mesa,0), 'FaceColor',COLOR_COMPRAS,     'EdgeColor','none');
 yline(0,'k-','LineWidth',0.8);
 title('Compras Netas Mesa (MM)','FontWeight','bold');
-ylabel('MM'); grid on; box off;
-
-nexttile;
-hold on;
-pos_mask = flujo >= 0;
-neg_mask = flujo < 0;
-bar(t(pos_mask), flujo(pos_mask), 'FaceColor',[0.3 0.7 0.3], 'EdgeColor','none','DisplayName','Flujo positivo');
-bar(t(neg_mask), flujo(neg_mask), 'FaceColor',[0.85 0.2 0.2], 'EdgeColor','none','DisplayName','Flujo negativo');
-yline(0,'k-','LineWidth',0.8);
-title('Flujo Neto Combinado (Retiros SF + Compras Mesa)','FontWeight','bold');
-ylabel('MM'); xlabel('Fecha'); legend('Location','best','FontSize',8); grid on; box off;
+ylabel('MM'); xlabel('Fecha'); grid on; box off;
 
 sgtitle('Series de Liquidez — AnalisisRetirosME','FontSize',13,'FontWeight','bold');
 
-% --- Fig 2: Drawdown acumulado + episodios sombreados ---
-figure('Name','Drawdown Acumulado','Position',[30 30 1300 550]);
-ax = axes; hold on;
+% --- Fig 2: Flujo neto + episodios sombreados ---
+figure('Name','Flujo Neto y Episodios','Position',[30 30 1300 500]);
+hold on;
 
 top_ep  = min(10, n_ep);
-cmap_ep = turbo(top_ep + 2);
-cmap_ep = cmap_ep(2:end-1,:);
+cmap_ep = turbo(top_ep + 2); cmap_ep = cmap_ep(2:end-1,:);
+y_lim   = [min(flujo)*1.15, max(flujo)*1.15];
 
-dd_min = min(drawdown) * 1.08;
 for e = 1:top_ep
     ep = ep_list(e);
     patch([ep.fecha_ini ep.fecha_fin ep.fecha_fin ep.fecha_ini], ...
-          [dd_min dd_min 0 0], cmap_ep(e,:), 'FaceAlpha',0.25,'EdgeColor','none');
-    % Etiqueta en la parte superior del sombreado
-    text(ep.fecha_ini + (ep.fecha_fin - ep.fecha_ini)/2, dd_min*0.05, ...
+          [y_lim(1) y_lim(1) y_lim(2) y_lim(2)], ...
+          cmap_ep(e,:), 'FaceAlpha',0.18, 'EdgeColor', cmap_ep(e,:), 'LineWidth',0.5);
+    text(ep.fecha_ini + (ep.fecha_fin-ep.fecha_ini)/2, y_lim(2)*0.92, ...
          sprintf('#%d',e), 'FontSize',8,'FontWeight','bold', ...
-         'Color', cmap_ep(e,:)*0.7, 'HorizontalAlignment','center');
+         'Color',cmap_ep(e,:)*0.65,'HorizontalAlignment','center');
 end
 
-plot(t, drawdown, 'Color',[0.1 0.1 0.1], 'LineWidth',1);
+bar(t, max(flujo,0), 'FaceColor',[0.3 0.65 0.3], 'EdgeColor','none','DisplayName','Positivo');
+bar(t, min(flujo,0), 'FaceColor',[0.85 0.2 0.2], 'EdgeColor','none','DisplayName','Negativo');
 yline(0,'k-','LineWidth',0.8);
-ylim([dd_min 0]);
-ylabel('MM acumulados'); xlabel('Fecha');
-title(sprintf('Drawdown Acumulado de Liquidez — Top %d Episodios de Estrés (gap ≤ 2 días)', top_ep), ...
+ylim(y_lim);
+legend('Location','best','FontSize',8);
+ylabel('MM'); xlabel('Fecha');
+title(sprintf('Flujo Neto Diario (Retiros SF + Compras Mesa) — Top %d Episodios de Estrés', top_ep), ...
     'FontWeight','bold');
 grid on; box off;
 
 % --- Fig 3: Zoom en los peores episodios ---
 figure('Name','Zoom Episodios Críticos','Position',[30 30 1400 780]);
 n_zoom = min(TOP_ZOOM, n_ep);
-ncols  = min(3, n_zoom);
-nrows  = ceil(n_zoom / ncols);
+ncols  = 3; nrows = ceil(n_zoom/ncols);
 tiledlayout(nrows, ncols, 'TileSpacing','compact','Padding','compact');
 
 for e = 1:n_zoom
     ep    = ep_list(e);
     ini_v = max(1, ep.inicio - MARGEN_ZOOM);
-    fin_v = min(n_obs, ep.fin + MARGEN_ZOOM);
+    fin_v = min(n_obs, ep.fin   + MARGEN_ZOOM);
     seg_v = ini_v:fin_v;
 
-    y_min = min([retiros_sf(seg_v); compras_mesa(seg_v)]) * 1.15;
-    y_max = max([retiros_sf(seg_v); compras_mesa(seg_v)]) * 1.15;
+    y_min = min([retiros_sf(seg_v); compras_mesa(seg_v)]) * 1.2;
+    y_max = max([retiros_sf(seg_v); compras_mesa(seg_v)]) * 1.2;
     if y_min == y_max; y_max = y_min + 1; end
 
     nexttile; hold on;
-    % Sombrear período del episodio
     patch([ep.fecha_ini ep.fecha_fin ep.fecha_fin ep.fecha_ini], ...
-          [y_min y_min y_max y_max], [1 0.8 0.8], ...
-          'FaceAlpha',0.35,'EdgeColor','none','HandleVisibility','off');
+          [y_min y_min y_max y_max],[1 0.75 0.75], ...
+          'FaceAlpha',0.4,'EdgeColor',[0.8 0.3 0.3],'LineWidth',0.8,'HandleVisibility','off');
     bar(t(seg_v), retiros_sf(seg_v),   'FaceColor',COLOR_RETIROS,'EdgeColor','none','DisplayName','Retiros SF');
     bar(t(seg_v), compras_mesa(seg_v), 'FaceColor',COLOR_COMPRAS,'EdgeColor','none','DisplayName','Compras Mesa');
     yline(0,'k-','LineWidth',0.8);
     ylim([y_min y_max]);
-    title(sprintf('#%d  %s → %s\nFlNeto: %.0f MM  |  FlNeg: %.0f MM  |  %d días', e, ...
-        datestr(ep.fecha_ini,'dd-mmm-yy'), datestr(ep.fecha_fin,'dd-mmm-yy'), ...
-        ep.flujo_acum, ep.flujo_neg_acum, ep.duracion), 'FontSize',8,'FontWeight','bold');
+    title(sprintf('#%d  %s → %s  (%dd)\nFlNeg: %.0f MM  |  Peor: %.0f MM (%s)', e, ...
+        datestr(ep.fecha_ini,'dd-mmm-yy'), datestr(ep.fecha_fin,'dd-mmm-yy'), ep.duracion, ...
+        ep.flujo_neg_acum, ep.peor_flujo, datestr(ep.fecha_peor,'dd-mmm-yy')), ...
+        'FontSize',8,'FontWeight','bold');
     ylabel('MM'); grid on; box off;
-    if e == 1; legend('Location','best','FontSize',7); end
+    if e==1; legend('Location','best','FontSize',7); end
 end
-sgtitle(sprintf('Zoom — %d Peores Episodios de Estrés (gap ≤ 2 días)', n_zoom), ...
+sgtitle(sprintf('Zoom — %d Peores Episodios de Estrés (gap ≤ %d días)', n_zoom, GAP_2D), ...
     'FontSize',13,'FontWeight','bold');
 
 % --- Fig 4: Ranking horizontal ---
-figure('Name','Ranking Episodios','Position',[30 30 950 620]);
+figure('Name','Ranking Episodios','Position',[30 30 980 650]);
 top_r  = min(TOP_RANKING, n_ep);
-dd_top = [ep_list(1:top_r).max_dd];
+fl_top = [ep_list(1:top_r).flujo_neg_acum];
 labels = arrayfun(@(ep) sprintf('%s → %s  (%dd)', ...
-    datestr(ep.fecha_ini,'mmm-yy'), datestr(ep.fecha_fin,'mmm-yy'), ep.duracion), ...
+    datestr(ep.fecha_ini,'dd-mmm-yy'), datestr(ep.fecha_fin,'dd-mmm-yy'), ep.duracion), ...
     ep_list(1:top_r), 'UniformOutput', false);
 
-barh(top_r:-1:1, dd_top(end:-1:1), 'FaceColor',[0.85 0.2 0.2], 'EdgeColor','none');
+barh(top_r:-1:1, fl_top(end:-1:1), 'FaceColor',[0.85 0.2 0.2], 'EdgeColor','none');
 set(gca,'YTick',1:top_r,'YTickLabel',flipud(labels),'FontSize',8);
-xlabel('Drawdown máximo (MM acumulados)');
-title(sprintf('Ranking — %d Peores Episodios de Estrés de Liquidez\n(ordenado por profundidad de drawdown, gap ≤ 2 días)', top_r), ...
-    'FontWeight','bold');
+xlabel('Flujo negativo acumulado en el episodio (MM)');
+title(sprintf('Ranking — %d Peores Episodios de Estrés de Liquidez\n(gap ≤ %d días | ordenado por flujo neg. acumulado)', ...
+    top_r, GAP_2D),'FontWeight','bold');
 grid on; box off;
 
-fprintf('\n============================================================\n');
-fprintf('  Análisis completado. Figuras generadas: 4\n');
-fprintf('============================================================\n');
-
 %% ============================================================
-%% 5. RESUMEN FINAL DE EPISODIOS CON FECHAS
+%% 4. RESUMEN FINAL EN CONSOLA
 %% ============================================================
-fprintf('\n\n');
+fprintf('\n');
 fprintf('############################################################\n');
-fprintf('##  EPISODIOS DE ESTRÉS IDENTIFICADOS — FECHAS EXACTAS   ##\n');
-fprintf('##  (tolerancia gap 2 días | dur. mín. %d días)           ##\n', MIN_DURACION);
+fprintf('##   EPISODIOS DE ESTRÉS — RESUMEN COMPLETO CON FECHAS   ##\n');
+fprintf('##   Gap ≤ %d días  |  Dur. mín. %d días                   ##\n', GAP_2D, MIN_DURACION);
 fprintf('############################################################\n\n');
 
-fprintf('%-4s  %-16s  %-16s  %6s  %12s  %12s  %12s  %-14s\n', ...
-    'Rank','Inicio','Fin','Días','Flujo neto','Flujo neg.','MaxDD','Peor fecha');
+fprintf('%-4s  %-13s  %-13s  %5s  %5s  %11s  %11s  %13s  %-13s\n', ...
+    'Rank','Inicio','Fin','Días','Neg.','FlNeto(MM)','FlNeg(MM)','Peor día(MM)','Fecha peor');
 fprintf('%s\n', repmat('─',1,100));
-
 for e = 1:n_ep
     ep = ep_list(e);
-    fprintf('%-4d  %-16s  %-16s  %6d  %12.1f  %12.1f  %12.1f  %-14s\n', e, ...
-        datestr(ep.fecha_ini,'dd-mmm-yyyy'), ...
-        datestr(ep.fecha_fin,'dd-mmm-yyyy'), ...
-        ep.duracion, ...
-        ep.flujo_acum, ...
-        ep.flujo_neg_acum, ...
-        ep.max_dd, ...
-        datestr(ep.fecha_peor,'dd-mmm-yyyy'));
+    fprintf('%-4d  %-13s  %-13s  %5d  %5d  %11.1f  %11.1f  %13.1f  %-13s\n', e, ...
+        datestr(ep.fecha_ini,'dd-mmm-yyyy'), datestr(ep.fecha_fin,'dd-mmm-yyyy'), ...
+        ep.duracion, ep.n_dias_neg, ep.flujo_acum, ep.flujo_neg_acum, ...
+        ep.peor_flujo, datestr(ep.fecha_peor,'dd-mmm-yyyy'));
 end
-
+fprintf('\n  Total episodios identificados: %d\n', n_ep);
+fprintf('  Período : %s → %s\n', datestr(t(1),'dd-mmm-yyyy'), datestr(t(end),'dd-mmm-yyyy'));
 fprintf('\n  Columnas:\n');
-fprintf('    Flujo neto  = suma diaria (Retiros SF + Compras Mesa) durante el episodio [MM]\n');
-fprintf('    Flujo neg.  = solo componente negativa acumulada durante el episodio [MM]\n');
-fprintf('    MaxDD       = profundidad máxima del drawdown dentro del episodio [MM]\n');
-fprintf('    Peor fecha  = fecha del día con el peor flujo diario\n');
-fprintf('\n  Total episodios: %d\n', n_ep);
-fprintf('  Período cubierto: %s → %s\n', ...
-    datestr(t(1),'dd-mmm-yyyy'), datestr(t(end),'dd-mmm-yyyy'));
+fprintf('    Días     = duración total del episodio\n');
+fprintf('    Neg.     = número de días con flujo negativo dentro del episodio\n');
+fprintf('    FlNeto   = flujo neto acumulado (pos + neg) durante el episodio [MM]\n');
+fprintf('    FlNeg    = solo días negativos acumulados durante el episodio [MM]\n');
+fprintf('    Peor día = flujo del peor día individual dentro del episodio [MM]\n');
