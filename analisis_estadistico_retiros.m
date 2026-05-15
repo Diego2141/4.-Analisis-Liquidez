@@ -17,9 +17,21 @@ nombres      = {'Saldo', 'Retiros', 'Flujo_C3', 'Flujo_C4'};
 n_series     = numel(series);
 n_obs        = size(data_values, 1);
 
+% Fechas
+tiene_fechas = exist('dates','var') && isa(dates,'datetime');
+if tiene_fechas
+    t = dates(:);
+    fprintf('Rango de fechas: %s  →  %s\n', datestr(t(1)), datestr(t(end)));
+else
+    t = (1:n_obs)';
+end
+
 fprintf('=============================================================\n');
 fprintf('  ANÁLISIS ESTADÍSTICO - AnalisisRetirosME\n');
 fprintf('  Observaciones: %d  |  Series: %d\n', n_obs, n_series);
+if tiene_fechas
+    fprintf('  Período: %s  →  %s\n', datestr(t(1),'dd-mmm-yyyy'), datestr(t(end),'dd-mmm-yyyy'));
+end
 fprintf('=============================================================\n\n');
 
 %% 2. ESTADÍSTICAS DESCRIPTIVAS
@@ -161,9 +173,10 @@ figure(fig_h); fig_h = fig_h+1;
 tiledlayout(n_series, 1, 'TileSpacing','compact');
 for i = 1:n_series
     nexttile;
-    plot(series{i}, 'LineWidth', 0.8);
+    plot(t, series{i}, 'LineWidth', 0.8);
     title(nombres{i}, 'FontWeight','bold');
-    xlabel('Observación'); ylabel('Valor');
+    if tiene_fechas; xlabel('Fecha'); else; xlabel('Observación'); end
+    ylabel('Valor');
     grid on; box off;
 end
 sgtitle('Series Temporales - AnalisisRetirosME', 'FontSize',13,'FontWeight','bold');
@@ -227,13 +240,15 @@ x = retiros;
 media_rod = movmean(x, ventana);
 std_rod   = movstd(x, ventana);
 subplot(2,1,1);
-plot(x, 'Color',[0.7 0.7 0.7]); hold on;
-plot(media_rod, 'b-', 'LineWidth', 1.5);
+plot(t, x, 'Color',[0.7 0.7 0.7]); hold on;
+plot(t, media_rod, 'b-', 'LineWidth', 1.5);
 title('Retiros: Media rodante'); ylabel('Valor'); legend('Serie','Media 250 obs'); grid on;
+if tiene_fechas; xlabel('Fecha'); end
 subplot(2,1,2);
-plot(std_rod, 'r-', 'LineWidth', 1.2);
+plot(t, std_rod, 'r-', 'LineWidth', 1.2);
 title('Retiros: Desviación estándar rodante (ventana 250)');
-ylabel('Std'); xlabel('Observación'); grid on;
+ylabel('Std'); if tiene_fechas; xlabel('Fecha'); else; xlabel('Observación'); end
+grid on;
 sgtitle('Análisis de Estacionariedad - Retiros', 'FontSize',13,'FontWeight','bold');
 
 % 9h. Matriz de correlación (heatmap)
